@@ -7,7 +7,7 @@ workflow{
 
     if (params.step == 1) {
         in_ch = channel.of(1,2,3)
-
+        out_ch = in_ch.first().view()
     }
 
     // Task 2 - Extract the last item from the channel
@@ -15,6 +15,7 @@ workflow{
     if (params.step == 2) {
 
         in_ch = channel.of(1,2,3)
+        out_ch = in_ch.last().view()
 
     }
 
@@ -23,7 +24,7 @@ workflow{
     if (params.step == 3) {
 
         in_ch = channel.of(1,2,3)
-
+        out_ch = in_ch.take(2).view()
 
     }
 
@@ -32,7 +33,7 @@ workflow{
     if (params.step == 4) {
 
         in_ch = channel.of(2,3,4)
-
+        out_ch = in_ch.map{n -> n * 2}.view()
 
     }
 
@@ -41,7 +42,7 @@ workflow{
     if (params.step == 5) {
 
         in_ch = channel.of(2,3,4)
-        in_ch.map { it -> it * it }.take(2).view()
+        out_ch = in_ch.map { it -> it * it }.take(2).view()
         
     }
 
@@ -50,6 +51,12 @@ workflow{
     if (params.step == 6) {
         
         in_ch = channel.of('Taylor', 'Swift')
+        out_ch = Channel
+            .from(1, 2, 3, 4, 5)
+            .toList()
+            .map { it.reverse() }
+            .flatten()
+            .view()
 
     }
 
@@ -58,8 +65,12 @@ workflow{
     if (params.step == 7) {
 
         in_ch = channel.fromPath('files_dir/*.fq')
-
-        
+    
+        Channel
+            in_ch
+            .map { file -> def name = file.getName() 
+            tuple(name, file.toString()) }
+            .view()  
     }
 
     // Task 8 - Combine the items from the two channels into a single channel
@@ -68,9 +79,7 @@ workflow{
 
         ch_1 = channel.of(1,2,3)
         ch_2 = channel.of(4,5,6)
-        out_ch = channel.of("a", "b", "c")
-
-
+        out_ch = ch_1.concat(ch_2).view()
     }
 
     // Task 9 - Flatten the channel
@@ -78,8 +87,7 @@ workflow{
     if (params.step == 9) {
 
         in_ch = channel.of([1,2,3], [4,5,6])
-
-
+        out_ch = in_ch.flatten().view()
     }
 
     // Task 10 - Collect the items of a channel into a list. What kind of channel is the output channel (value)?
@@ -87,6 +95,7 @@ workflow{
     if (params.step == 10) {
 
         in_ch = channel.of(1,2,3)
+        out_ch = in_ch.toList().view() //Value channel
 
     }
     
@@ -100,6 +109,15 @@ workflow{
     if (params.step == 11) {
 
         in_ch = channel.of([1, 'V'], [3, 'M'], [2, 'O'], [1, 'f'], [3, 'G'], [1, 'B'], [2, 'L'], [2, 'E'], [3, '33'])
+        
+        in_ch
+            .toList()
+            .map { items -> items.groupBy { it[0] }      // group by first element
+                 .collect { k, v -> [k, v*.getAt(1)] }  
+                 // k = first item, v = list of pairs → take second element
+        }
+        .sort { a, b -> a[0] <=> b[0] } //sort by key
+        .view()
 
     }
 
@@ -110,6 +128,8 @@ workflow{
         left_ch = channel.of([1, 'V'], [3, 'M'], [2, 'O'], [1, 'B'], [3, '33'])
         right_ch = channel.of([1, 'f'], [3, 'G'], [2, 'L'], [2, 'E'],)
 
+        joint_ch = left_ch.join(right_ch).view()
+
     }
 
     // Task 13 - Split the input channel into two channels, one of all the even numbers and the other of all the odd numbers. Write the output of each channel to a list
@@ -118,7 +138,12 @@ workflow{
     if (params.step == 13) {
 
         in_ch = channel.of(1,2,3,4,5,6,7,8,9,10)
+          
+        def even_ch = in_ch.filter { it % 2 == 0 }
+        def odd_ch  = in_ch.filter { it % 2 != 0 }
 
+        even_ch.toList().view { list -> "Even numbers: $list" }
+        odd_ch.toList().view  { list -> "Odd numbers:  $list" }
     }
 
     // Task 14 - Nextflow has the concept of maps. Write the names in the maps in this channel to a file called "names.txt". Each name should be on a new line. 
@@ -135,6 +160,13 @@ workflow{
             ['name': 'Hagrid', 'title': 'groundkeeper'],
             ['name': 'Dobby', 'title': 'hero'],
         )
+
+        names_ch = in_ch.map { it.name }
+
+        names_ch.toList().subscribe { names ->
+        new File("results").mkdirs()
+        new File("results/names.txt").withWriter { writer -> names.each { writer.println(it) }}
+        println "Written names.txt with ${names.size()} names."}
     
     }
 
